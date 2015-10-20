@@ -43,24 +43,23 @@ import java.util.Locale;
  * @version 2012.09 initial version
  * @since 2012.09
  */
-public class VDCServices implements DataCenterServices {
-    private vCloud provider;
+public class VDCServices extends AbstractDataCenterServices<vCloud> {
 
-    VDCServices(vCloud provider) { this.provider = provider; }
+    VDCServices(vCloud provider) { super(provider); }
 
     private transient volatile VDCCapabilities capabilities;
-    @Nonnull
+
     @Override
-    public DataCenterCapabilities getCapabilities() throws InternalException, CloudException {
+    public @Nonnull DataCenterCapabilities getCapabilities() throws InternalException, CloudException {
         if( capabilities == null ) {
-            capabilities = new VDCCapabilities(provider);
+            capabilities = new VDCCapabilities(getProvider());
         }
         return capabilities;
     }
 
     @Override
     public @Nullable DataCenter getDataCenter(@Nonnull String providerDataCenterId) throws InternalException, CloudException {
-        APITrace.begin(provider, "DC.getDataCenter");
+        APITrace.begin(getProvider(), "DC.getDataCenter");
         try {
             for( Region region : listRegions() ) {
                 for( DataCenter dc : listDataCenters(region.getProviderRegionId()) ) {
@@ -77,18 +76,8 @@ public class VDCServices implements DataCenterServices {
     }
 
     @Override
-    public @Nonnull String getProviderTermForDataCenter(@Nonnull Locale locale) {
-        return "VDC";
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForRegion(@Nonnull Locale locale) {
-        return "Org";
-    }
-
-    @Override
     public @Nullable Region getRegion(@Nonnull String providerRegionId) throws InternalException, CloudException {
-        APITrace.begin(provider, "DC.getRegion");
+        APITrace.begin(getProvider(), "DC.getRegion");
         try {
             for( Region region : listRegions() ) {
                 if( providerRegionId.equals(region.getProviderRegionId()) ) {
@@ -104,17 +93,12 @@ public class VDCServices implements DataCenterServices {
 
     @Override
     public @Nonnull Collection<DataCenter> listDataCenters(@Nonnull String providerRegionId) throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new CloudException("No context was specified for this request");
-        }
-        if( !providerRegionId.equals(ctx.getRegionId()) ) {
+        if( !providerRegionId.equals(getContext().getRegionId()) ) {
             return Collections.emptyList();
         }
-        APITrace.begin(provider, "DC.listDataCenters");
+        APITrace.begin(getProvider(), "DC.listDataCenters");
         try {
-            return (new vCloudMethod(provider)).listDataCenters();
+            return (new vCloudMethod(getProvider())).listDataCenters();
         }
         finally {
             APITrace.end();
@@ -123,9 +107,9 @@ public class VDCServices implements DataCenterServices {
 
     @Override
     public @Nonnull Collection<Region> listRegions() throws InternalException, CloudException {
-        APITrace.begin(provider, "DC.listRegions");
+        APITrace.begin(getProvider(), "DC.listRegions");
         try {
-            return Collections.singletonList((new vCloudMethod(provider)).getRegion());
+            return Collections.singletonList((new vCloudMethod(getProvider())).getRegion());
         }
         finally {
             APITrace.end();

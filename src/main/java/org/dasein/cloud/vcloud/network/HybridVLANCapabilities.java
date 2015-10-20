@@ -75,6 +75,11 @@ public class HybridVLANCapabilities extends AbstractCapabilities<vCloud> impleme
     }
 
     @Override
+    public boolean allowsDeletionOfReservedSubnets() throws CloudException, InternalException {
+        return false; // TODO(stas): not sure, leaving false by default
+    }
+
+    @Override
     public int getMaxNetworkInterfaceCount() throws CloudException, InternalException {
         return 0; // TODO: currently not supported by the driver
     }
