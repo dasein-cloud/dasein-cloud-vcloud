@@ -159,6 +159,12 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
         return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.NONE);
     }
 
+    @Nonnull
+    @Override
+    public Requirement identifyUsernameRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
     @Override
     public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.OPTIONAL;
