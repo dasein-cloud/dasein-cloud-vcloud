@@ -913,6 +913,11 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         return Collections.emptyList();
     }
 
+    @Override
+     public @Nonnull Iterable<VirtualMachineProduct> listAllProducts() throws InternalException, CloudException{
+        return listProducts(null, VirtualMachineProductFilterOptions.getInstance());
+    }
+
     @Nonnull
     public Iterable<VirtualMachineProduct> listProducts(@Nonnull String providerMachineImageId, @Nullable VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "listVMProducts");
