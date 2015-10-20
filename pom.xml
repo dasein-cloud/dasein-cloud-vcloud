@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2015.10.1-SNAPSHOT</version>
+  <version>2015.10.1</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
@@ -28,7 +28,8 @@
         <connection>scm:git:git://github.com/dasein-cloud/dasein-cloud-vcloud.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/dasein-cloud/dasein-cloud-vcloud.git</developerConnection>
         <url>http://github.com/dasein-cloud/dasein-cloud-vcloud</url>
-    </scm>
+      <tag>dasein-cloud-vcloud-2015.10.1</tag>
+  </scm>
         
   <dependencies>
     <dependency>
