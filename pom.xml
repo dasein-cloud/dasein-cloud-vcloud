@@ -2,11 +2,11 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2015.09.1-SNAPSHOT</version>
+  <version>2015.10.1-SNAPSHOT</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
-  <url>http://github.com/greese/dasein-cloud-aws</url>
+  <url>http://github.com/dasein-cloud/dasein-cloud-aws</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -25,22 +25,16 @@
     </organization>
 
     <scm>
-        <connection>scm:git:git://github.com/greese/dasein-cloud-vcloud.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/greese/dasein-cloud-vcloud.git</developerConnection>
-        <url>http://github.com/greese/dasein-cloud-vcloud</url>
+        <connection>scm:git:git://github.com/dasein-cloud/dasein-cloud-vcloud.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/dasein-cloud/dasein-cloud-vcloud.git</developerConnection>
+        <url>http://github.com/dasein-cloud/dasein-cloud-vcloud</url>
     </scm>
-    
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>5</version>
-  </parent>
         
   <dependencies>
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2015.09.1-SNAPSHOT</version>
+        <version>2015.10.1</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -77,7 +71,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2015.09.1-SNAPSHOT</version>
+          <version>2015.10.2</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -143,7 +137,7 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2014</year>
+                    <year>2009-2015</year>
                     <copyrightHolder>Dell, Inc</copyrightHolder>
                 </properties>
             </configuration>
@@ -165,10 +159,7 @@
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-release-plugin</artifactId>
-            <version>2.1</version>
-            <configuration>
-                <tagBase>https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/tags/dasein-cloud-nova</tagBase>
-            </configuration>
+            <version>2.5.3</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -237,9 +228,9 @@
                     <value>${compat}</value>
                 </property>
             </systemProperties>
-          <includes>
-            <include>**/TestSuite.java</include>
-          </includes>
+          <excludes>
+            <exclude>**/TestSuite.java</exclude>
+          </excludes>
         </configuration>
       </plugin>     
       <plugin>
@@ -255,7 +246,32 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>       
+      </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+                <execution>
+                    <id>sign-artifacts</id>
+                    <phase>deploy</phase>
+                    <goals>
+                        <goal>sign</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.3</version>
+            <extensions>true</extensions>
+            <configuration>
+                <serverId>sonatype-nexus-staging</serverId>
+                <nexusUrl>https://oss.sonatype.org</nexusUrl>
+                <autoReleaseAfterClose>true</autoReleaseAfterClose>
+            </configuration>
+        </plugin>
     </plugins>
   </build>
   
