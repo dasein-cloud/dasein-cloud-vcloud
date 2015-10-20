@@ -54,7 +54,7 @@ import java.util.Map;
  * <p>Created by George Reese: 2/10/13 12:10 PM</p>
  * @author George Reese
  */
-public class DiskSupport extends AbstractVolumeSupport {
+public class DiskSupport extends AbstractVolumeSupport<vCloud> {
     static private final Logger logger = vCloud.getLogger(DiskSupport.class);
 
     DiskSupport(@Nonnull vCloud provider) { super(provider); }
@@ -63,7 +63,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String deviceId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Volume.attachVolume");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             StringBuilder xml = new StringBuilder();
 
             xml.append("<DiskAttachOrDetachParams xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
@@ -89,7 +89,7 @@ public class DiskSupport extends AbstractVolumeSupport {
             if( !isSubscribed() ) {
                 throw new OperationNotSupportedException("This account is not subscribed for creating volume");
             }
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             String vdcId = options.getDataCenterId();
 
             if( vdcId == null ) {
@@ -125,7 +125,7 @@ public class DiskSupport extends AbstractVolumeSupport {
             Node href = disk.getAttributes().getNamedItem("href");
 
             if( href != null ) {
-                String volumeId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                String volumeId = getProvider().toID(href.getNodeValue().trim());
 
                 try {
                     Map<String,Object> meta = options.getMetaData();
@@ -185,7 +185,7 @@ public class DiskSupport extends AbstractVolumeSupport {
             if( serverId == null ) {
                 throw new CloudException("No virtual machine is attached to this volume");
             }
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             StringBuilder xml = new StringBuilder();
 
             xml.append("<DiskAttachOrDetachParams xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
@@ -200,17 +200,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public @Nonnull DiskCapabilities getCapabilities() {
-        return new DiskCapabilities((vCloud)getProvider());
-    }
-
-    @Override
-    public @Nonnull Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
-        return new Storage<Gigabyte>(1, Storage.GIGABYTE);
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForVolume(@Nonnull Locale locale) {
-        return "disk";
+        return new DiskCapabilities(getProvider());
     }
 
     @Override
@@ -230,18 +220,6 @@ public class DiskSupport extends AbstractVolumeSupport {
     }
 
     @Override
-    public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
-        ArrayList<String> ids = new ArrayList<String>();
-
-        for( int i=5; i<10; i++ ) {
-            for( int j=0; j<10; j++ ) {
-                ids.add(i + ":" + j);
-            }
-        }
-        return ids;
-    }
-
-    @Override
     public @Nonnull Iterable<ResourceStatus> listVolumeStatus() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Volume.listVolumeStatus");
         try {
@@ -256,7 +234,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     public @Nonnull Iterable<Volume> listVolumes() throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Volume.listVolumes");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             ArrayList<Volume> volumes = new ArrayList<Volume>();
 
             for( DataCenter dc : method.listDataCenters() ) {
@@ -290,7 +268,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
                                         if( type != null && type.getNodeValue().equals(method.getMediaTypeForDisk()) ) {
                                             Node href = resource.getAttributes().getNamedItem("href");
-                                            Volume volume = toVolume(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                                            Volume volume = toVolume(dc.getProviderDataCenterId(), getProvider().toID(href.getNodeValue().trim()));
 
                                             if( volume != null ) {
                                                 volumes.add(volume);
@@ -315,7 +293,7 @@ public class DiskSupport extends AbstractVolumeSupport {
         APITrace.begin(getProvider(), "Volume.isSubscribed");
         try {
             if( getProvider().testContext() != null ) {
-                vCloudMethod method = new vCloudMethod(((vCloud)getProvider()));
+                vCloudMethod method = new vCloudMethod(getProvider());
 
 
                 return vCloudMethod.matches(method.getAPIVersion(), "5.1", null);
@@ -331,7 +309,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Volume.remove");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
 
             method.delete("disk", volumeId);
         }
@@ -351,7 +329,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     }
 
     private @Nullable Volume toVolume(@Nonnull String dcId, @Nonnull String volumeId) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         Volume volume = new Volume();
 
         volume.setProviderVolumeId(volumeId);
@@ -445,7 +423,7 @@ public class DiskSupport extends AbstractVolumeSupport {
                     Node href = vm.getAttributes().getNamedItem("href");
 
                     if( href != null ) {
-                        volume.setProviderVirtualMachineId(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                        volume.setProviderVirtualMachineId(getProvider().toID(href.getNodeValue().trim()));
                     }
                 }
             }
@@ -471,7 +449,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     			removeTags(volumeId, collectionForDelete);
     		}
     		Map<String,Object> metadata = new HashMap<String, Object>();
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		for( Tag tag : tags ) {
     			metadata.put(tag.getKey(), tag.getValue());
     		}
@@ -494,7 +472,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     	APITrace.begin(getProvider(), "Volume.updateTags");
     	try {
     		Map<String,Object> metadata = new HashMap<String, Object>();
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		for( Tag tag : tags ) {
     			metadata.put(tag.getKey(), tag.getValue());
     		}
@@ -517,7 +495,7 @@ public class DiskSupport extends AbstractVolumeSupport {
     	APITrace.begin(getProvider(), "Volume.removeTags");
     	try {
     		Map<String,Object> metadata = new HashMap<String, Object>();
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		for( Tag tag : tags ) {
     			metadata.put(tag.getKey(), tag.getValue());
     		}

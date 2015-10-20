@@ -208,7 +208,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                         Node href = n.getAttributes().getNamedItem("href");
 
                         if( href != null ) {
-                            return ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                            return getProvider().toID(href.getNodeValue().trim());
                         }
                     }
                 }
@@ -221,7 +221,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public VirtualMachine getVirtualMachine(@Nonnull String vmId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.getVirtualMachine");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             String xml = method.get("vApp", vmId);
 
             if( xml != null && !xml.equals("") ) {
@@ -253,7 +253,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                 Node href = n.getAttributes().getNamedItem("href");
 
                                 if( href != null ) {
-                                    parentVapp = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                                    parentVapp = getProvider().toID(href.getNodeValue().trim());
                                     vdc = getVDC(parentVapp);
                                 }
                             }
@@ -261,7 +261,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     }
                 }
                 if( vdc != null ) {
-                    return toVirtualMachine(vdc, parentVapp, vmNode, ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans());
+                    return toVirtualMachine(vdc, parentVapp, vmNode, getProvider().getNetworkServices().getVlanSupport().listVlans());
                 }
             }
             return null;
@@ -307,8 +307,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 throw new CloudException("Unable to identify a target data center for deploying VM");
             }
             final VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
-            final vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-            final MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
+            final vCloudMethod method = new vCloudMethod(getProvider());
+            final MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
             if( img == null ) {
                 throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
@@ -327,7 +327,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 String defaultVlanName = (String)img.getTag("defaultVlanName");
                 String defaultVlanNameDHCP = (String)img.getTag("defaultVlanNameDHCP");
                 if (defaultVlanName != null && !defaultVlanName.trim().isEmpty()) {
-                    Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
+                    Iterable<VLAN> vlans = getProvider().getNetworkServices().getVlanSupport().listVlans();
                     for (VLAN vlan : vlans) {
                         if (defaultVlanName.equalsIgnoreCase(vlan.getName())) {
                             vlanId = vlan.getProviderVlanId();
@@ -343,7 +343,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
             }
 
-            final VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
+            final VLAN vlan = getProvider().getNetworkServices().getVlanSupport().getVlan(vlanId);
             if( vlan != null ) {
                 //check image tags
                 String parentName = null, parentId = null, parentHref = null;
@@ -461,7 +461,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             Node vapp = vapps.item(0);
             Node href = vapp.getAttributes().getNamedItem("href");
 
-            String vappId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+            String vappId = getProvider().toID(href.getNodeValue().trim());
 
             String vAppResponse = method.get("vApp", vappId);
 
@@ -484,7 +484,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 // take suffixes into account:
                 if (basename.length() > 25) {
                     try {
-                        vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
+                        vCloudMethod dmethod = new vCloudMethod(getProvider());
                         dmethod.delete("vApp", vappId);
                     } catch (Throwable t) {
                         logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
@@ -493,7 +493,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
                 if (fullname.length() > 126) {
                     try {
-                        vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
+                        vCloudMethod dmethod = new vCloudMethod(getProvider());
                         dmethod.delete("vApp", vappId);
                     } catch (Throwable t) {
                         logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
@@ -562,7 +562,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     Node href = vapp.getAttributes().getNamedItem("href");
 
                     if( href != null ) {
-                        String vappId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                        String vappId = getProvider().toID(href.getNodeValue().trim());
                         String vAppResponse;
                         try {
                             vAppResponse = method.get("vApp", vappId);
@@ -671,7 +671,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                             count++;
                                             String vmUrl = href.getNodeValue().trim();
 
-                                            vmId = ((vCloud)getProvider()).toID(vmUrl);
+                                            vmId = getProvider().toID(vmUrl);
 
                                             StringBuilder guestXml = new StringBuilder();
                                             guestXml.append("<GuestCustomizationSection xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
@@ -869,7 +869,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             Node vmHref = vmNode.getAttributes().getNamedItem("href");
             if( vmHref != null ) {
                 String vmUrl = vmHref.getNodeValue().trim();
-                vmId = ((vCloud)getProvider()).toID(vmUrl);
+                vmId = getProvider().toID(vmUrl);
             }
             else {
                 vmId = null;
@@ -914,13 +914,12 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     @Nonnull
-    @Override
-    public Iterable<VirtualMachineProduct> listProducts(@Nullable VirtualMachineProductFilterOptions options, @Nullable Architecture architecture) throws InternalException, CloudException {
+    public Iterable<VirtualMachineProduct> listProducts(@Nonnull String providerMachineImageId, @Nullable VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "listVMProducts");
         try {
             String cacheName = "productsALL";
-            if( architecture != null ) {
-                cacheName = "products" + architecture.name();
+            if( options.getArchitecture() != null ) {
+                cacheName = "products" + options.getArchitecture().name();
             }
             Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), cacheName, VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
             Iterable<VirtualMachineProduct> products = cache.get(getContext());
@@ -929,7 +928,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 ArrayList<VirtualMachineProduct> list = new ArrayList<VirtualMachineProduct>();
 
                 try {
-                    String resource = ((vCloud)getProvider()).getVMProductsResource();
+                    String resource = getProvider().getVMProductsResource();
                     InputStream input = vAppSupport.class.getResourceAsStream(resource);
 
                     if( input != null ) {
@@ -982,13 +981,13 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             boolean supported = false;
 
                             // If architecture is specified, check if product matches
-                            if( architecture != null && product.has("architectures") ) {
+                            if( options != null && options.getArchitecture() != null && product.has("architectures") ) {
                                 JSONArray architectures = product.getJSONArray("architectures");
 
                                 for( int j=0; j<architectures.length(); j++ ) {
                                     String a = architectures.getString(j);
 
-                                    if( architecture.name().equals(a) ) {
+                                    if( options.getArchitecture().name().equals(a) ) {
                                         supported = true;
                                         break;
                                     }
@@ -1079,8 +1078,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 try {
                     APITrace.begin(getProvider(), "VM.listVirtualMachines");
                     try {
-                        Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
-                        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+                        Iterable<VLAN> vlans = getProvider().getNetworkServices().getVlanSupport().listVlans();
+                        vCloudMethod method = new vCloudMethod(getProvider());
 
                         for( DataCenter dc : method.listDataCenters() ) {
                             String xml = method.get("vdc", dc.getProviderDataCenterId());
@@ -1112,7 +1111,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                                     if( type != null && type.getNodeValue().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
                                                         Node href = resource.getAttributes().getNamedItem("href");
 
-                                                        loadVmsFor(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()), iterator, vlans);
+                                                        loadVmsFor(dc.getProviderDataCenterId(), getProvider().toID(href.getNodeValue().trim()), iterator, vlans);
                                                     }
                                                 }
                                             }
@@ -1136,7 +1135,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     private void loadVmsFor(@Nonnull String vdcId, @Nonnull String id, @Nonnull Jiterator<VirtualMachine> vms, @Nonnull Iterable<VLAN> vlans) throws InternalException, CloudException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
 
         String xml = method.get("vApp", id);
 
@@ -1181,7 +1180,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.reboot");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             String xml = method.get("vApp", vmId);
 
             if( xml != null ) {
@@ -1270,7 +1269,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     private void startVapp(@Nonnull String vappId, boolean wait) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vappId);
 
         if( xml != null ) {
@@ -1327,7 +1326,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     private void stopVappOrVm(@Nonnull String id, boolean force) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", id);
         if (xml == null) {
             throw new CloudException("No information returned for ID: " + id);
@@ -1364,7 +1363,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     private void stopVappOrOneVm(String vAppId, String vmId, boolean force) throws CloudException, InternalException {
 
         // 3. Does the vApp contain multiple VMs?
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vAppId);
         if (xml == null) {
             throw new CloudException("No information returned for ID: " + vAppId);
@@ -1413,7 +1412,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     private void stop(String vAppId, @Nonnull String vmId, boolean force, boolean wait, boolean killByVM) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vmId);
 
         if( xml != null ) {
@@ -1492,7 +1491,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                         if( type != null && type.getNodeValue().trim().equals(method.getMediaTypeForVApp()) ) {
                             Node href = node.getAttributes().getNamedItem("href");
                             if( href != null ) {
-                                return ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                                return getProvider().toID(href.getNodeValue().trim());
                             }
                         }
                     }
@@ -1514,7 +1513,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     private void suspendVapp(@Nonnull String vappId) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vappId);
 
         if( xml != null ) {
@@ -1574,7 +1573,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             boolean contains = false;
             int count = 0;
 
-            loadVmsFor(vm.getProviderDataCenterId(), vappId, vms, ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans());
+            loadVmsFor(vm.getProviderDataCenterId(), vappId, vms, getProvider().getNetworkServices().getVlanSupport().listVlans());
 
             for( VirtualMachine v : vms ) {
                 count++;
@@ -1899,7 +1898,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
                 VirtualMachineProduct product = null;
 
-                for( VirtualMachineProduct prd : listProducts(Architecture.I64) ) {
+                for( VirtualMachineProduct prd : listProducts("bogus", VirtualMachineProductFilterOptions.getInstance().withArchitecture(Architecture.I64)) ) {
                     if( prd.getCpuCount() == cpu && memory == prd.getRamSize().intValue() ) {
                         product = prd;
                         break;
@@ -2095,7 +2094,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
     	APITrace.begin(getProvider(), "VM.setTags");
     	try {
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		Tag[] collectionForDelete = TagUtils.getTagsForDelete(getVirtualMachine(vmId).getTags(), tags);
     		if (collectionForDelete.length != 0 ) {
     			removeTags(vmId, collectionForDelete);
@@ -2122,7 +2121,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public void updateTags( @Nonnull String vmId, @Nonnull Tag... tags ) throws CloudException, InternalException {
     	APITrace.begin(getProvider(), "VM.updateTags");
     	try {
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		Map<String,Object> metadata = new HashMap<String, Object>();
     		for( Tag tag : tags ) {
     			metadata.put(tag.getKey(), tag.getValue());
@@ -2145,7 +2144,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public void removeTags( @Nonnull String vmId, @Nonnull Tag... tags ) throws CloudException, InternalException {
     	APITrace.begin(getProvider(), "VM.removeTags");
     	try {
-    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		vCloudMethod method = new vCloudMethod(getProvider());
     		Map<String,Object> metadata = new HashMap<String, Object>();
     		for( Tag tag : tags ) {
     			metadata.put(tag.getKey(), tag.getValue());

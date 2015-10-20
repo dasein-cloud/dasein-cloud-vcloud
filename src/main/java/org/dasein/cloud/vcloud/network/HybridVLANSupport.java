@@ -46,14 +46,12 @@ import java.util.*;
  * @version 2013.04 initial version
  * @since 2013.04
  */
-public class HybridVLANSupport extends AbstractVLANSupport {
+public class HybridVLANSupport extends AbstractVLANSupport<vCloud> {
 
     private volatile transient HybridVLANCapabilities capabilities;
-    private vCloud provider;
 
     HybridVLANSupport(@Nonnull vCloud provider) {
         super(provider);
-        this.provider = provider;
     }
 
     @Override
@@ -65,31 +63,46 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     @Override
     public VLANCapabilities getCapabilities() throws CloudException, InternalException {
         if( capabilities == null ) {
-            capabilities = new HybridVLANCapabilities(provider);
+            capabilities = new HybridVLANCapabilities(getProvider());
         }
         return capabilities;
     }
 
+    @Nonnull
     @Override
-    public @Nonnull String getProviderTermForNetworkInterface(@Nonnull Locale locale) {
-        return "network interface";
+    public String getProviderTermForNetworkInterface(@Nonnull Locale locale) {
+        try {
+            return getCapabilities().getProviderTermForNetworkInterface(locale);
+        } catch (CloudException | InternalException e) {
+            throw new RuntimeException(e);
+        }
     }
 
+    @Nonnull
     @Override
-    public @Nonnull String getProviderTermForSubnet(@Nonnull Locale locale) {
-        return "subnet";
+    public String getProviderTermForSubnet(@Nonnull Locale locale) {
+        try {
+            return getCapabilities().getProviderTermForSubnet(locale);
+        } catch (CloudException | InternalException e) {
+            throw new RuntimeException(e);
+        }
     }
 
+    @Nonnull
     @Override
-    public @Nonnull String getProviderTermForVlan(@Nonnull Locale locale) {
-        return "network";
+    public String getProviderTermForVlan(@Nonnull Locale locale) {
+        try {
+            return getCapabilities().getProviderTermForVlan(locale);
+        } catch (CloudException | InternalException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.getVlan");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
 
             for( DataCenter dc : method.listDataCenters() ) {
                 VLAN vlan = toVlan(dc.getProviderDataCenterId(), vlanId);
@@ -129,7 +142,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     @Nonnull
     @Override
     public Collection<InternetGateway> listInternetGateways(@Nullable String s) throws CloudException, InternalException {
-        return null;
+        return Collections.emptyList();
     }
 
     @Override
@@ -142,7 +155,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
             if( cached != null ) {
                 return cached;
             }
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             ArrayList<VLAN> vlans = new ArrayList<VLAN>();
 
             for( DataCenter dc : method.listDataCenters() ) {
@@ -172,7 +185,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                                     if( resource.getNodeName().equalsIgnoreCase(nsString + "Network") && resource.hasAttributes() ) {
                                         Node href = resource.getAttributes().getNamedItem("href");
 
-                                        VLAN vlan = toVlan(dc.getProviderDataCenterId(), ((vCloud) getProvider()).toID(href.getNodeValue().trim()));
+                                        VLAN vlan = toVlan(dc.getProviderDataCenterId(), getProvider().toID(href.getNodeValue().trim()));
 
                                         if( vlan != null ) {
                                             vlans.add(vlan);
@@ -197,7 +210,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     }
 
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
 
         String xml = method.get("network", id);
 

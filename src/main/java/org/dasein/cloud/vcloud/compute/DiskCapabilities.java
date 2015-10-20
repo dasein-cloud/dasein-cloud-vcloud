@@ -66,16 +66,6 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
     }
 
     @Override
-    public int getMaximumVolumeProductIOPS() throws InternalException, CloudException {
-        return LIMIT_UNKNOWN;
-    }
-
-    @Override
-    public int getMinimumVolumeProductIOPS() throws InternalException, CloudException {
-        return LIMIT_UNKNOWN;
-    }
-
-    @Override
     public int getMaximumVolumeSizeIOPS() throws InternalException, CloudException {
         return LIMIT_UNKNOWN;
     }
@@ -87,7 +77,7 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
 
     @Override
     public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
-        return null;
+        return new Storage<Gigabyte>(100, Storage.GIGABYTE); // TODO(stas): added as default, needs a review
     }
 
     @Override
@@ -97,7 +87,7 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
 
     @Override
     public @Nonnull NamingConstraints getVolumeNamingConstraints() throws CloudException, InternalException {
-        return null; // TODO: DANGER! DANGER!
+        return NamingConstraints.getHostNameInstance(false); // TODO(stas): added as default, needs a review
     }
 
     @Override
@@ -138,7 +128,22 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
     }
 
     @Override
+    public boolean supportsAttach() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsDetach() {
+        return true;
+    }
+
+    @Override
     public Requirement getDeviceIdOnAttachRequirement(){
         return Requirement.REQUIRED;
+    }
+
+    @Override
+    public boolean supportsIOPSVolumes() throws InternalException, CloudException {
+        return false; // TODO(stas): not sure, leaving as false by default
     }
 }

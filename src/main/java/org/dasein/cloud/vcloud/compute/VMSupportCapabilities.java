@@ -143,6 +143,12 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
         return null;
     }
 
+    @Nonnull
+    @Override
+    public String[] getVirtualMachineReservedUserNames() {
+        return new String[0];
+    }
+
     @Override
     public @Nonnull Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
@@ -206,6 +212,11 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
     @Override
     public boolean isUserDefinedPrivateIPSupported() throws CloudException, InternalException {
         return false; //todo supported in vcloud but not in dasein yet
+    }
+
+    @Override
+    public boolean isRootPasswordSSHKeyEncrypted() throws CloudException, InternalException {
+        return false;
     }
 
     @Override
