@@ -6,7 +6,7 @@
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
-  <url>http://github.com/dasein-cloud/dasein-cloud-aws</url>
+  <url>http://github.com/dasein-cloud/dasein-cloud-vcloud</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
