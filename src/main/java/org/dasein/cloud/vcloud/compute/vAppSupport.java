@@ -19,9 +19,13 @@
 package org.dasein.cloud.vcloud.compute;
 
 import org.apache.log4j.Logger;
+import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.GeneralCloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.ResourceNotFoundException;
 import org.dasein.cloud.Tag;
+import org.dasein.cloud.TaskInProgressException;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
@@ -149,7 +153,14 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.getProduct");
         try {
-            VirtualMachineProduct product = super.getProduct(productId);
+            VirtualMachineProduct product = null;
+
+            Iterable<VirtualMachineProduct> list = listAllProducts();
+            for (VirtualMachineProduct p : list) {
+                if (p.getProviderProductId().equals(productId)) {
+                    product = p;
+                }
+            }
 
             if( product == null && productId.startsWith("custom") ) {
                 String[] parts = productId.split(":");
@@ -290,7 +301,9 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             final String fullname = withLaunchOptions.getHostName();
             final String basename = validateHostName(withLaunchOptions.getHostName());
             if (basename.length() > 27) {
-               throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
+                //todo
+                //should we have a new exception for errors caused by user/client provided data?
+                throw new InternalException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
 
             String vdcId = withLaunchOptions.getDataCenterId();
@@ -304,14 +317,14 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
             }
             if( vdcId == null ) {
-                throw new CloudException("Unable to identify a target data center for deploying VM");
+                throw new ResourceNotFoundException("Unable to identify a target data center for deploying VM");
             }
             final VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
             final vCloudMethod method = new vCloudMethod(getProvider());
             final MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
             if( img == null ) {
-                throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
+                throw new ResourceNotFoundException("No such image: " + withLaunchOptions.getMachineImageId());
             }
             StringBuilder xml = new StringBuilder();
 
@@ -334,12 +347,12 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                         }
                     }
                     if (vlanId == null) {
-                        throw new CloudException("Could not locate default vlan '" + defaultVlanName + "'");
+                        throw new ResourceNotFoundException("Could not locate default vlan '" + defaultVlanName + "'");
                     }
                 } else if (defaultVlanNameDHCP != null && !defaultVlanNameDHCP.trim().isEmpty()) {
-                    throw new CloudException("No vlan selected and the default is DHCP-based which is not supported");
+                    throw new GeneralCloudException("No vlan selected and the default is DHCP-based which is not supported", CloudErrorType.GENERAL);
                 } else {
-                    throw new CloudException("No vlan specified and no default.");
+                    throw new GeneralCloudException("No vlan specified and no default.", CloudErrorType.GENERAL);
                 }
             }
 
@@ -382,7 +395,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             }
                         }
                         if (parentId == null || parentHref == null) {
-                            throw new CloudException("Unable to find the network config settings - cannot specify network for this vApp");
+                            throw new ResourceNotFoundException("Unable to find the network config settings - cannot specify network for this vApp");
                         }
                     }
 
@@ -421,7 +434,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
             }
             else {
-                throw new CloudException("Failed to find vlan " + vlanId);
+                throw new ResourceNotFoundException("Failed to find vlan " + vlanId);
             }
             xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
             xml.append("</InstantiateVAppTemplateParams>");
@@ -441,7 +454,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 method.waitFor(instantiateResponse);
             } catch (CloudException e) {
                 logger.error("Error waiting for " + vCloudMethod.INSTANTIATE_VAPP + " task to complete", e);
-                throw new CloudException("Error waiting for " + vCloudMethod.INSTANTIATE_VAPP + " task to complete");
+                throw new TaskInProgressException("Error waiting for " + vCloudMethod.INSTANTIATE_VAPP + " task to complete");
             }
 
             Document composeDoc = method.parseXML(instantiateResponse);
@@ -456,7 +469,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             NodeList vapps = composeDoc.getElementsByTagName(nsString + "VApp");
 
             if( vapps.getLength() < 1 ) {
-                throw new CloudException("The instantiation operation succeeded, but no vApp was present");
+                throw new GeneralCloudException("The instantiation operation succeeded, but no vApp was present", CloudErrorType.GENERAL);
             }
             Node vapp = vapps.item(0);
             Node href = vapp.getAttributes().getNamedItem("href");
@@ -472,7 +485,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 } catch( Throwable t ) {
                     logger.error("Problem backing out after vApp went away: " + t.getMessage());
                 }
-                throw new CloudException("vApp went away");
+                throw new ResourceNotFoundException("vApp went away: "+vappId);
             }
 
             final Document doc = method.parseXML(vAppResponse);
@@ -489,7 +502,9 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     } catch (Throwable t) {
                         logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
                     }
-                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 25: '" + basename + "' is " + basename.length());
+                    //todo
+                    //should we have a new exception for errors caused by user/client provided data?
+                    throw new InternalException("Because there are multiple VMs in this vApp, the maximum name length is 25: '" + basename + "' is " + basename.length());
                 }
                 if (fullname.length() > 126) {
                     try {
@@ -498,14 +513,20 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     } catch (Throwable t) {
                         logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
                     }
-                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 126: '" + basename + "' is " + basename.length());
+                    //todo
+                    //should we have a new exception for errors caused by user/client provided data?
+                    throw new InternalException("Because there are multiple VMs in this vApp, the maximum name length is 126: '" + basename + "' is " + basename.length());
                 }
             } else if (basename.length() > 27) {
                 // should have been rejected already
-                throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
+                //todo
+                //should we have a new exception for errors caused by user/client provided data?
+                throw new InternalException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
             else if (fullname.length() > 128) {
-                throw new CloudException("The maximum name length is 128: '" + basename + "' is " + basename.length());
+                //todo
+                //should we have a new exception for errors caused by user/client provided data?
+                throw new InternalException("The maximum name length is 128: '" + basename + "' is " + basename.length());
             }
 
             String vmId = parseVmId(vmNodes);
@@ -521,7 +542,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     } catch( Throwable t ) {
                         logger.error("Problem backing out after no virtual machines exist in response: " + t.getMessage());
                     }
-                    throw new CloudException("No virtual machines exist in response");
+                    throw new GeneralCloudException("No virtual machines exist in response", CloudErrorType.GENERAL);
                 }
             }
             VirtualMachine vm = getVirtualMachine(vmId);
@@ -533,7 +554,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 } catch( Throwable t ) {
                     logger.error("Problem backing out after failing to identify VM in response: " + t.getMessage());
                 }
-                throw new CloudException("Unable to identify VM " + vmId + ".");
+                throw new ResourceNotFoundException("Unable to identify VM " + vmId + ".");
             }
 
             final String fvmId = vmId;
@@ -1059,22 +1080,6 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     @Override
-    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
-        Iterable<Architecture> list = cache.get(getContext());
-
-        if( list == null) {
-            ArrayList<Architecture> a = new ArrayList<Architecture>();
-
-            a.add(Architecture.I32);
-            a.add(Architecture.I64);
-            list = a;
-            cache.put(getContext(), Collections.unmodifiableList(a));
-        }
-        return list;
-    }
-
-    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         getProvider().hold();
         PopulatorThread<VirtualMachine> populator = new PopulatorThread<VirtualMachine>(new JiteratorPopulator<VirtualMachine>() {
@@ -1334,7 +1339,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", id);
         if (xml == null) {
-            throw new CloudException("No information returned for ID: " + id);
+            throw new ResourceNotFoundException("No information returned for ID: " + id);
         }
         Document doc = method.parseXML(xml);
         String docElementTagName = doc.getDocumentElement().getTagName();
@@ -1356,7 +1361,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         // 2. It's a VM. Find vApp ID
         String vAppId = parseParentVappId(nodes, method);
         if (vAppId == null) {
-            throw new CloudException("No parent vApp ID found for: " + id);
+            throw new ResourceNotFoundException("No parent vApp ID found for: " + id);
         }
 
         // 3. Does the vApp contain multiple VMs?
@@ -1371,7 +1376,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vAppId);
         if (xml == null) {
-            throw new CloudException("No information returned for ID: " + vAppId);
+            throw new ResourceNotFoundException("No information returned for ID: " + vAppId);
         }
 
         Document doc = method.parseXML(xml);
@@ -1412,7 +1417,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             // 4b. If the vApp contains just one VM, undeploy the vApp
             undeploy(vAppId, powerAction);
         } else {
-            throw new CloudException("Expected at least one VM");
+            throw new ResourceNotFoundException("Expected at least one VM");
         }
     }
 
@@ -1571,7 +1576,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             VirtualMachine vm = getVirtualMachine(vmId);
 
             if( vm == null ) {
-                throw new CloudException("No such virtual machine: " + vmId);
+                throw new ResourceNotFoundException("No such virtual machine: " + vmId);
             }
             String vappId = (String)vm.getTag(PARENT_VAPP_ID);
             Jiterator<VirtualMachine> vms = new Jiterator<VirtualMachine>();

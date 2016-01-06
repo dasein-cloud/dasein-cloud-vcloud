@@ -19,13 +19,15 @@
 package org.dasein.cloud.vcloud.compute;
 
 import org.apache.log4j.Logger;
+import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.GeneralCloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
+import org.dasein.cloud.ResourceNotFoundException;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
-import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeFormat;
@@ -37,7 +39,8 @@ import org.dasein.cloud.util.TagUtils;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
-import org.dasein.util.uom.storage.*;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -46,7 +49,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -109,17 +111,19 @@ public class DiskSupport extends AbstractVolumeSupport<vCloud> {
             String response = method.post(vCloudMethod.CREATE_DISK, vdcId, xml.toString());
 
             if( response.length() < 1 ) {
-                throw new CloudException("No error, but no volume");
+                throw new GeneralCloudException("No error, but no volume", CloudErrorType.GENERAL);
             }
 
             Document doc = method.parseXML(response);
             String docElementTagName = doc.getDocumentElement().getTagName();
             String nsString = "";
-            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            if(docElementTagName.contains(":")) {
+                nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            }
             NodeList disks = doc.getElementsByTagName(nsString + "Disk");
 
             if( disks.getLength() < 1 ) {
-                throw new CloudException("No error, but no volume");
+                throw new GeneralCloudException("No error, but no volume", CloudErrorType.GENERAL);
             }
             Node disk = disks.item(0);
             Node href = disk.getAttributes().getNamedItem("href");
@@ -164,7 +168,7 @@ public class DiskSupport extends AbstractVolumeSupport<vCloud> {
                 }
                 return volumeId;
             }
-            throw new CloudException("No ID provided in Disk XML");
+            throw new GeneralCloudException("No ID provided in Disk XML", CloudErrorType.GENERAL);
         }
         finally {
             APITrace.end();
@@ -178,12 +182,14 @@ public class DiskSupport extends AbstractVolumeSupport<vCloud> {
             Volume volume = getVolume(volumeId);
 
             if( volume == null ) {
-                throw new CloudException("No such volume: " + volumeId);
+                throw new ResourceNotFoundException("No such volume: " + volumeId);
             }
             String serverId = volume.getProviderVirtualMachineId();
 
             if( serverId == null ) {
-                throw new CloudException("No virtual machine is attached to this volume");
+                //todo
+                //should we have a new exception for errors caused by user/client provided data?
+                throw new InternalException("No virtual machine is attached to this volume");
             }
             vCloudMethod method = new vCloudMethod(getProvider());
             StringBuilder xml = new StringBuilder();

@@ -82,12 +82,27 @@ public class vCloudException extends CloudException {
         }
         data.title = major + ":" + minor;
         data.description = message;
-        if( code == HttpServletResponse.SC_FORBIDDEN || code == HttpServletResponse.SC_UNAUTHORIZED ) {
-            data.type = CloudErrorType.AUTHENTICATION;
+        CloudErrorType errorType;
+
+        switch ((code)) {
+            case HttpServletResponse.SC_BAD_REQUEST:
+                errorType = CloudErrorType.INVALID_USER_DATA;
+                break;
+            case HttpServletResponse.SC_UNAUTHORIZED:
+            case HttpServletResponse.SC_FORBIDDEN:
+                errorType = CloudErrorType.AUTHENTICATION;
+                break;
+            case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                errorType = CloudErrorType.COMMUNICATION;
+                break;
+            case 429:
+                errorType = CloudErrorType.THROTTLING;
+                break;
+            default:
+                errorType = CloudErrorType.GENERAL;
+                break;
         }
-        else {
-            data.type = CloudErrorType.GENERAL;
-        }
+        data.type = errorType;
         return data;
     }
 
