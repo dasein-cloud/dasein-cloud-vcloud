@@ -68,6 +68,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
@@ -508,6 +509,15 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
         Cache<MachineImage> cache = Cache.getInstance(getProvider(), "listImages", MachineImage.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(6, TimePeriod.MINUTE));
         Iterable<MachineImage> imageList = cache.get(getContext());
         if (imageList != null) {
+            if (options != null) {
+                List<MachineImage> tmp = new ArrayList<MachineImage>();
+                for (MachineImage img : imageList) {
+                    if (options.matches(img)) {
+                        tmp.add(img);
+                    }
+                }
+                return tmp;
+            }
             return imageList;
         }
 
@@ -543,6 +553,15 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
             Iterable<MachineImage> imageList2 = cache.get(getContext());
             if (imageList2 != null) {
                 // A thread we were waiting on has refreshed the cache
+                if (options != null) {
+                    List<MachineImage> tmp = new ArrayList<MachineImage>();
+                    for (MachineImage img : imageList2) {
+                        if (options.matches(img)) {
+                            tmp.add(img);
+                        }
+                    }
+                    return tmp;
+                }
                 return imageList2;
             }
 
@@ -588,25 +607,23 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                                             String catalogItemId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
                                             MachineImage image = loadTemplate(catalog.owner, catalogItemId, catalog.published);
                                             if( image != null ) {
-                                                if( options == null || options.matches(image) ) {
-                                                    image.setProviderOwnerId(catalog.owner);
-                                                    try {
-                                                    	String metaData = method.get("vAppTemplate", image.getProviderMachineImageId() + "/metadata");
-                                                    	if( metaData != null && !metaData.equals("") ) {
-                                                    		method.parseMetaData(image, metaData);
-                                                    	}
+                                                image.setProviderOwnerId(catalog.owner);
+                                                try {
+                                                    String metaData = method.get("vAppTemplate", image.getProviderMachineImageId() + "/metadata");
+                                                    if( metaData != null && !metaData.equals("") ) {
+                                                        method.parseMetaData(image, metaData);
                                                     }
-                                                    catch( Throwable warning ) {
-                                                    	if (logger.isDebugEnabled()) {
-                                                    		logger.warn("Failed to get and parse image metadata.", warning);
-                                                    	}
-                                                    	else {
-                                                    		logger.warn("Failed to get and parse image metadata.");
-                                                    	}
-                                                    }
-                                                    image.setTag("catalogItemId", catalogItemId);
-                                                    images.add(image);
                                                 }
+                                                catch( Throwable warning ) {
+                                                    if (logger.isDebugEnabled()) {
+                                                        logger.warn("Failed to get and parse image metadata.", warning);
+                                                    }
+                                                    else {
+                                                        logger.warn("Failed to get and parse image metadata.");
+                                                    }
+                                                }
+                                                image.setTag("catalogItemId", catalogItemId);
+                                                images.add(image);
                                             }
                                         }
                                     }
@@ -1081,6 +1098,9 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                                                 if( options == null || options.matches(image) ) {
                                                     image.setProviderOwnerId(catalog.owner);
                                                     image.setTag("catalogItemId", catalogItemId);
+                                                    if (image.getTag("public") != null && image.getTag("public").equals("true")) {
+                                                        image = image.sharedWithPublic();
+                                                    }
                                                     images.add(image);
                                                 }
                                             }
