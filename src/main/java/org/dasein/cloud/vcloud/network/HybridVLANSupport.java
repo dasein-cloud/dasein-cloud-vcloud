@@ -106,11 +106,6 @@ public class HybridVLANSupport extends AbstractVLANSupport<vCloud> {
     }
 
     @Override
-    public boolean isNetworkInterfaceSupportEnabled() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.isSubscribed");
         try {
