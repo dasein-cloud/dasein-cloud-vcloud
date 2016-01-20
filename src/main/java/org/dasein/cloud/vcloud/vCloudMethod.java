@@ -547,7 +547,7 @@ public class vCloudMethod {
                         org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
                     }
                     if( org.token == null ) {
-                        throw new AuthenticationException(CloudErrorType.AUTHENTICATION, 200, "Token Empty", "No token was provided");
+                        throw new AuthenticationException(200, "Token Empty", "No token was provided");
                     }
                     HttpEntity entity = response.getEntity();
                     String body;
@@ -560,7 +560,7 @@ public class vCloudMethod {
                         }
                     }
                     catch( IOException e ) {
-                        throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     try {
                         ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -656,13 +656,13 @@ public class vCloudMethod {
                         }
                     }
                     catch( IOException e ) {
-                        throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     catch( ParserConfigurationException e ) {
-                        throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     catch( SAXException e ) {
-                        throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                 }
                 else {
@@ -679,7 +679,7 @@ public class vCloudMethod {
                             }
                         }
                         catch( IOException e ) {
-                            throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                            throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                         }
                         vCloudException.Data data = null;
                         CloudErrorType errorType;
@@ -716,7 +716,7 @@ public class vCloudMethod {
                         logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
                         throw new vCloudException(data);
                     }
-                    throw new AuthenticationException(CloudErrorType.AUTHENTICATION, status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
+                    throw new AuthenticationException(status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
                 }
                 if( org.endpoint == null ) {
                     throw new GeneralCloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
@@ -1367,7 +1367,7 @@ public class vCloudMethod {
                     }
                 }
                 catch( IOException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 try {
                     ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -1439,13 +1439,13 @@ public class vCloudMethod {
                     return v;
                 }
                 catch( IOException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( ParserConfigurationException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( SAXException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
             }
             else {
@@ -1654,7 +1654,7 @@ public class vCloudMethod {
                     }
                 }
                 catch( IOException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 try {
                     ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -1702,13 +1702,13 @@ public class vCloudMethod {
                     org.setVdcs(vdcs);
                 }
                 catch( IOException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( ParserConfigurationException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( SAXException e ) {
-                    throw new CommunicationException(CloudErrorType.COMMUNICATION, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
             }
             else {
