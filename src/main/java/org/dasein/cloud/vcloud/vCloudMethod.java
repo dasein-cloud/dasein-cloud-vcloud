@@ -297,7 +297,7 @@ public class vCloudMethod {
             logger.debug("HTTP STATUS: " + code);
 
             if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                throw new ResourceNotFoundException("Org URL is invalid: "+org.url);
+                throw new ResourceNotFoundException("Org URL", org.url);
             }
             else if (code == HttpServletResponse.SC_FORBIDDEN ) {
                 throw new AuthenticationException("Permissions issue with cloud account for org URL "+org.url).withFaultType(AuthenticationException.AuthenticationFaultType.FORBIDDEN);
@@ -437,7 +437,7 @@ public class vCloudMethod {
                 }
             }
         }
-        throw new ResourceNotFoundException("Could not find " + orgId + " among listed orgs");
+        throw new ResourceNotFoundException("Org", orgId);
     }
 
     public @Nonnull Org authenticate(boolean force) throws CloudException, InternalException {
@@ -1903,7 +1903,7 @@ public class vCloudMethod {
                 }
             }
             if( vdc == null ) {
-                throw new ResourceNotFoundException("No VDC was identified for this request (requested " + vdcId + ")");
+                throw new ResourceNotFoundException("VDC", vdcId);
             }
             String contentType;
 
@@ -2002,7 +2002,7 @@ public class vCloudMethod {
                 logger.debug("HTTP STATUS: " + code);
 
                 if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new ResourceNotFoundException("No action match for " + endpoint);
+                    throw new ResourceNotFoundException("Action match("+action+")", endpoint);
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
                     authenticate(true);
@@ -2256,7 +2256,7 @@ public class vCloudMethod {
                 logger.debug("HTTP STATUS: " + code);
 
                 if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new ResourceNotFoundException("No action match for " + endpoint);
+                    throw new ResourceNotFoundException("Action match("+action+")", endpoint);
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
                     authenticate(true);

@@ -118,16 +118,16 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
             String vAppId = (vm == null ? null : (String)vm.getTag(vAppSupport.PARENT_VAPP_ID));
 
             if( vm == null ) {
-                throw new ResourceNotFoundException("No such virtual machine: " + vmId);
+                throw new ResourceNotFoundException("Virtual machine", vmId);
             }
             else if( vAppId == null ) {
-                throw new ResourceNotFoundException("Unable to determine virtual machine vApp for capture: " + vmId);
+                throw new ResourceNotFoundException("Virtual machine vApp for virtual machine", vmId);
             }
             long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE * 10L);
 
             while( timeout > System.currentTimeMillis() ) {
                 if( vm == null ) {
-                    throw new ResourceNotFoundException("VM " + vmId + " went away");
+                    throw new ResourceNotFoundException("VirtualMachine ", vmId);
                 }
                 if( !vm.getCurrentState().equals(VmState.PENDING) ) {
                     break;
@@ -168,7 +168,7 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                         logger.warn("The cloud thinks the vApp or VM is still running; going to check what's going on: " + e.getMessage());
                         vm = ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
                         if( vm == null ) {
-                            throw new ResourceNotFoundException("Virtual machine went away");
+                            throw new ResourceNotFoundException("Virtual machine", vmId);
                         }
                         if( !vm.getCurrentState().equals(VmState.STOPPED) ) {
                             logger.warn("Current state of VM: " + vm.getCurrentState());
@@ -189,7 +189,7 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                 NodeList vapps = doc.getElementsByTagName("VAppTemplate");
 
                 if( vapps.getLength() < 1 ) {
-                    throw new ResourceNotFoundException("No vApp templates were found in response");
+                    throw new ResourceNotFoundException("vApp templates were not found in response", "n/a");
                 }
                 Node vapp = vapps.item(0);
                 String imageId = null;
@@ -199,12 +199,12 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                     imageId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
                 }
                 if( imageId == null || imageId.length() < 1 ) {
-                    throw new ResourceNotFoundException("No imageId was found in response");
+                    throw new ResourceNotFoundException("ImageId not found in response", "n/a");
                 }
                 MachineImage img = loadVapp(imageId, getContext().getAccountNumber(), false, options.getName(), options.getDescription(), System.currentTimeMillis());
 
                 if( img == null ) {
-                    throw new ResourceNotFoundException("Image was lost");
+                    throw new ResourceNotFoundException("Image", imageId);
                 }
                 method.waitFor(response);
                 publish(img);
@@ -263,11 +263,11 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                 }
             }
             if( href == null ) {
-                throw new ResourceNotFoundException("No catalog could be identified for publishing vApp template " + img.getProviderMachineImageId());
+                throw new ResourceNotFoundException("Catalog for publishing vApp template", img.getProviderMachineImageId());
             }
             c = getCatalog(false, href);
             if( c == null ) {
-                throw new ResourceNotFoundException("No catalog could be identified for publishing vApp template " + img.getProviderMachineImageId());
+                throw new ResourceNotFoundException("Catalog for publishing vApp template ", img.getProviderMachineImageId());
             }
         }
 
@@ -1033,7 +1033,7 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
             MachineImage image = getImage(providerImageId);
 
             if( image == null ) {
-                throw new ResourceNotFoundException("No such image: " + providerImageId);
+                throw new ResourceNotFoundException("Image", providerImageId);
             }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String catalogItemId = (String)image.getTag("catalogItemId");

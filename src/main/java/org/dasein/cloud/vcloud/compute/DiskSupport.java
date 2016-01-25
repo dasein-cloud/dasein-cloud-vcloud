@@ -182,7 +182,7 @@ public class DiskSupport extends AbstractVolumeSupport<vCloud> {
             Volume volume = getVolume(volumeId);
 
             if( volume == null ) {
-                throw new ResourceNotFoundException("No such volume: " + volumeId);
+                throw new ResourceNotFoundException("Volume", volumeId);
             }
             String serverId = volume.getProviderVirtualMachineId();
 

@@ -317,14 +317,14 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
             }
             if( vdcId == null ) {
-                throw new ResourceNotFoundException("Unable to identify a target data center for deploying VM");
+                throw new ResourceNotFoundException("Target data center for deploying VM", "n/a");
             }
             final VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
             final vCloudMethod method = new vCloudMethod(getProvider());
             final MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
             if( img == null ) {
-                throw new ResourceNotFoundException("No such image: " + withLaunchOptions.getMachineImageId());
+                throw new ResourceNotFoundException("Image", withLaunchOptions.getMachineImageId());
             }
             StringBuilder xml = new StringBuilder();
 
@@ -347,7 +347,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                         }
                     }
                     if (vlanId == null) {
-                        throw new ResourceNotFoundException("Could not locate default vlan '" + defaultVlanName + "'");
+                        throw new ResourceNotFoundException("Default vlan", defaultVlanName);
                     }
                 } else if (defaultVlanNameDHCP != null && !defaultVlanNameDHCP.trim().isEmpty()) {
                     throw new GeneralCloudException("No vlan selected and the default is DHCP-based which is not supported", CloudErrorType.GENERAL);
@@ -395,7 +395,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             }
                         }
                         if (parentId == null || parentHref == null) {
-                            throw new ResourceNotFoundException("Unable to find the network config settings - cannot specify network for this vApp");
+                            throw new ResourceNotFoundException("Network config settings for image", img.getProviderMachineImageId());
                         }
                     }
 
@@ -434,7 +434,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
             }
             else {
-                throw new ResourceNotFoundException("Failed to find vlan " + vlanId);
+                throw new ResourceNotFoundException("Vlan", vlanId);
             }
             xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
             xml.append("</InstantiateVAppTemplateParams>");
@@ -485,7 +485,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 } catch( Throwable t ) {
                     logger.error("Problem backing out after vApp went away: " + t.getMessage());
                 }
-                throw new ResourceNotFoundException("vApp went away: "+vappId);
+                throw new ResourceNotFoundException("vApp", vappId);
             }
 
             final Document doc = method.parseXML(vAppResponse);
@@ -554,7 +554,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 } catch( Throwable t ) {
                     logger.error("Problem backing out after failing to identify VM in response: " + t.getMessage());
                 }
-                throw new ResourceNotFoundException("Unable to identify VM " + vmId + ".");
+                throw new ResourceNotFoundException("VM", vmId);
             }
 
             final String fvmId = vmId;
@@ -1339,7 +1339,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", id);
         if (xml == null) {
-            throw new ResourceNotFoundException("No information returned for ID: " + id);
+            throw new ResourceNotFoundException("Vm", id);
         }
         Document doc = method.parseXML(xml);
         String docElementTagName = doc.getDocumentElement().getTagName();
@@ -1361,7 +1361,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         // 2. It's a VM. Find vApp ID
         String vAppId = parseParentVappId(nodes, method);
         if (vAppId == null) {
-            throw new ResourceNotFoundException("No parent vApp ID found for: " + id);
+            throw new ResourceNotFoundException("Parent vApp ID found for vm", id);
         }
 
         // 3. Does the vApp contain multiple VMs?
@@ -1376,7 +1376,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vAppId);
         if (xml == null) {
-            throw new ResourceNotFoundException("No information returned for ID: " + vAppId);
+            throw new ResourceNotFoundException("Information for vapp", vAppId);
         }
 
         Document doc = method.parseXML(xml);
@@ -1417,7 +1417,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             // 4b. If the vApp contains just one VM, undeploy the vApp
             undeploy(vAppId, powerAction);
         } else {
-            throw new ResourceNotFoundException("Expected at least one VM");
+            throw new ResourceNotFoundException("VM for vapp", vAppId);
         }
     }
 
@@ -1576,7 +1576,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             VirtualMachine vm = getVirtualMachine(vmId);
 
             if( vm == null ) {
-                throw new ResourceNotFoundException("No such virtual machine: " + vmId);
+                throw new ResourceNotFoundException("Virtual machine", vmId);
             }
             String vappId = (String)vm.getTag(PARENT_VAPP_ID);
             Jiterator<VirtualMachine> vms = new Jiterator<VirtualMachine>();
