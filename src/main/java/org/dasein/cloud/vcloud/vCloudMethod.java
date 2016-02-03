@@ -46,11 +46,15 @@ import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
+import org.dasein.cloud.AuthenticationException;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.CommunicationException;
 import org.dasein.cloud.ContextRequirements;
+import org.dasein.cloud.GeneralCloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceNotFoundException;
 import org.dasein.cloud.Taggable;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.dc.Region;
@@ -59,8 +63,8 @@ import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.time.Day;
-import org.dasein.util.uom.time.TimePeriod;
 import org.dasein.util.uom.time.Minute;
+import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -105,6 +109,11 @@ public class vCloudMethod {
     static public final String COMPOSE_VAPP     = "composeVApp";
     static public final String CREATE_DISK      = "createDisk";
     static public final String INSTANTIATE_VAPP = "instantiateVApp";
+
+    /**
+     * 429 Too many requests	The user has sent too many requests in a given amount of time
+     */
+    static public final int TOO_MANY_REQUESTS = 429;
 
     static public boolean isSupported(@Nonnull String version) {
         for( String v : VERSIONS ) {
@@ -287,8 +296,11 @@ public class vCloudMethod {
 
             logger.debug("HTTP STATUS: " + code);
 
-            if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
-                throw new CloudException("Org URL is invalid");
+            if( code == HttpServletResponse.SC_NOT_FOUND ) {
+                throw new ResourceNotFoundException("Org URL", org.url);
+            }
+            else if (code == HttpServletResponse.SC_FORBIDDEN ) {
+                throw new AuthenticationException("Permissions issue with cloud account for org URL "+org.url).withFaultType(AuthenticationException.AuthenticationFaultType.FORBIDDEN);
             }
             else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
                 authenticate(true);
@@ -296,7 +308,7 @@ public class vCloudMethod {
                 return;
             }
             else if( code == HttpServletResponse.SC_NO_CONTENT ) {
-                throw new CloudException("No content from org URL");
+                throw new GeneralCloudException("No content from org URL", CloudErrorType.GENERAL);
             }
             else if( code == HttpServletResponse.SC_OK ) {
                 try {
@@ -315,7 +327,7 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error", e);
                 }
             }
             else {
@@ -336,10 +348,25 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error", e);
                 }
 
                 vCloudException.Data data = null;
+                CloudErrorType errorType;
+                switch ((code)) {
+                    case HttpServletResponse.SC_BAD_REQUEST:
+                        errorType = CloudErrorType.INVALID_USER_DATA;
+                        break;
+                    case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                        errorType = CloudErrorType.COMMUNICATION;
+                        break;
+                    case TOO_MANY_REQUESTS:
+                        errorType = CloudErrorType.THROTTLING;
+                        break;
+                    default:
+                        errorType = CloudErrorType.GENERAL;
+                        break;
+                }
 
                 if( xml != null && !xml.equals("") ) {
                     Document doc = parseXML(xml);
@@ -353,7 +380,7 @@ public class vCloudMethod {
                     }
                 }
                 if( data == null ) {
-                    throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                    throw new vCloudException(errorType, code, response.getStatusLine().getReasonPhrase(), "No further information");
                 }
                 logger.error("[" +  code + " : " + data.title + "] " + data.description);
                 throw new vCloudException(data);
@@ -366,7 +393,7 @@ public class vCloudMethod {
             }
         }
         if( xml == null ) {
-            throw new CloudException("No content from org URL");
+            throw new GeneralCloudException("No content from org URL", CloudErrorType.GENERAL);
         }
         Document doc = parseXML(xml);
         String docElementTagName = doc.getDocumentElement().getTagName();
@@ -410,16 +437,13 @@ public class vCloudMethod {
                 }
             }
         }
-        throw new CloudException("Could not find " + orgId + " among listed orgs");
+        throw new ResourceNotFoundException("Org", orgId);
     }
 
     public @Nonnull Org authenticate(boolean force) throws CloudException, InternalException {
         Cache<Org> cache = Cache.getInstance(provider, "vCloudOrgs", Org.class, CacheLevel.CLOUD_ACCOUNT, new TimePeriod<Minute>(25, TimePeriod.MINUTE));
         ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new CloudException("No context was defined for this request");
-        }
         String accountNumber = ctx.getAccountNumber();
         Iterable<Org> orgs = cache.get(ctx);
         Iterator<Org> it = ((force || orgs == null) ? null : orgs.iterator());
@@ -495,7 +519,7 @@ public class vCloudMethod {
                     status = response.getStatusLine();
                 }
                 catch( IOException e ) {
-                    throw new CloudException(e);
+                    throw new CommunicationException("I/O error in authenticate method", e);
                 }
                 if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
                     if( matches(getAPIVersion(), "0.8", "0.8") ) {
@@ -523,7 +547,7 @@ public class vCloudMethod {
                         org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
                     }
                     if( org.token == null ) {
-                        throw new CloudException(CloudErrorType.AUTHENTICATION, 200, "Token Empty", "No token was provided");
+                        throw new AuthenticationException(200, "Token Empty", "No token was provided");
                     }
                     HttpEntity entity = response.getEntity();
                     String body;
@@ -536,7 +560,7 @@ public class vCloudMethod {
                         }
                     }
                     catch( IOException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     try {
                         ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -632,13 +656,13 @@ public class vCloudMethod {
                         }
                     }
                     catch( IOException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     catch( ParserConfigurationException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                     catch( SAXException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                        throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                     }
                 }
                 else {
@@ -655,9 +679,25 @@ public class vCloudMethod {
                             }
                         }
                         catch( IOException e ) {
-                            throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                            throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                         }
                         vCloudException.Data data = null;
+                        CloudErrorType errorType;
+                        switch ((status.getStatusCode())) {
+                            case HttpServletResponse.SC_BAD_REQUEST:
+                                errorType = CloudErrorType.INVALID_USER_DATA;
+                                break;
+                            case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                                errorType = CloudErrorType.COMMUNICATION;
+                                break;
+                            case TOO_MANY_REQUESTS:
+                                errorType = CloudErrorType.THROTTLING;
+                                break;
+                            default:
+                                errorType = CloudErrorType.GENERAL;
+                                break;
+                        }
+
 
                         if( body != null && !body.equals("") ) {
                             Document doc = parseXML(body);
@@ -671,15 +711,15 @@ public class vCloudMethod {
                             }
                         }
                         if( data == null ) {
-                            throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
+                            throw new vCloudException(errorType, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                         }
                         logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
                         throw new vCloudException(data);
                     }
-                    throw new CloudException(CloudErrorType.AUTHENTICATION, status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
+                    throw new AuthenticationException(status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
                 }
                 if( org.endpoint == null ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
+                    throw new GeneralCloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
                 cache.put(ctx, Collections.singletonList(org));
                 loadVDCs(org);
@@ -748,7 +788,7 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    throw new InternalException(e);
+                    throw new CommunicationException("I/O error from server communications: " + e.getMessage(), e);
                 }
                 int code = response.getStatusLine().getStatusCode();
 
@@ -775,10 +815,29 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
 
                     vCloudException.Data data = null;
+                    CloudErrorType errorType;
+                    switch ((code)) {
+                        case HttpServletResponse.SC_BAD_REQUEST:
+                            errorType = CloudErrorType.INVALID_USER_DATA;
+                            break;
+                        case HttpServletResponse.SC_FORBIDDEN:
+                            errorType = CloudErrorType.AUTHENTICATION;
+                            break;
+                        case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                            errorType = CloudErrorType.COMMUNICATION;
+                            break;
+                        case TOO_MANY_REQUESTS:
+                            errorType = CloudErrorType.THROTTLING;
+                            break;
+                        default:
+                            errorType = CloudErrorType.GENERAL;
+                            break;
+                    }
+
 
                     if( xml != null && !xml.equals("") ) {
                         Document doc = parseXML(xml);
@@ -792,7 +851,7 @@ public class vCloudMethod {
                         }
                     }
                     if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                        throw new vCloudException(errorType, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
                     logger.error("[" +  code + " : " + data.title + "] " + data.description);
                     throw new vCloudException(data);
@@ -813,7 +872,7 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     return xml;
                 }
@@ -879,7 +938,7 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    throw new InternalException(e);
+                    throw new CommunicationException("I/O error from server communications: " + e.getMessage(), e);
                 }
                 int code = response.getStatusLine().getStatusCode();
 
@@ -914,7 +973,7 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     return xml;
                 }
@@ -935,10 +994,25 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
 
                     vCloudException.Data data = null;
+                    CloudErrorType errorType;
+                    switch ((code)) {
+                        case HttpServletResponse.SC_BAD_REQUEST:
+                            errorType = CloudErrorType.INVALID_USER_DATA;
+                            break;
+                        case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                            errorType = CloudErrorType.COMMUNICATION;
+                            break;
+                        case TOO_MANY_REQUESTS:
+                            errorType = CloudErrorType.THROTTLING;
+                            break;
+                        default:
+                            errorType = CloudErrorType.GENERAL;
+                            break;
+                    }
 
                     if( xml != null && !xml.equals("") ) {
                         Document doc = parseXML(xml);
@@ -952,7 +1026,7 @@ public class vCloudMethod {
                         }
                     }
                     if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                        throw new vCloudException(errorType, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
                     logger.error("[" +  code + " : " + data.title + "] " + data.description);
                     throw new vCloudException(data);
@@ -990,13 +1064,10 @@ public class vCloudMethod {
     protected @Nonnull HttpClient getClient(boolean forAuthentication) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new CloudException("No context was defined for this request");
-        }
         String endpoint = ctx.getCloud().getEndpoint();
 
         if( endpoint == null ) {
-            throw new CloudException("No cloud endpoint was defined");
+            throw new InternalException("No cloud endpoint was defined");
         }
         boolean ssl = endpoint.startsWith("https");
         int targetPort;
@@ -1010,7 +1081,7 @@ public class vCloudMethod {
             }
         }
         catch( URISyntaxException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
         HttpHost targetHost = new HttpHost(uri.getHost(), targetPort, uri.getScheme());
         HttpParams params = new BasicHttpParams();
@@ -1230,9 +1301,6 @@ public class vCloudMethod {
 
         ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new CloudException("No context was defined for this request");
-        }
         {
             Iterable<Version> versions = cache.get(ctx);
 
@@ -1285,7 +1353,7 @@ public class vCloudMethod {
                 status = response.getStatusLine();
             }
             catch( IOException e ) {
-                throw new CloudException(e);
+                throw new CommunicationException("I/O Exception getting api version", e);
             }
             if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
                 HttpEntity entity = response.getEntity();
@@ -1299,7 +1367,7 @@ public class vCloudMethod {
                     }
                 }
                 catch( IOException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 try {
                     ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -1363,7 +1431,7 @@ public class vCloudMethod {
                         set.add(v);
                     }
                     if( set.isEmpty() ) {
-                        throw new CloudException("Unable to identify a supported version");
+                        throw new GeneralCloudException("Unable to identify a supported version", CloudErrorType.GENERAL);
                     }
                     Version v = set.iterator().next();
 
@@ -1371,13 +1439,13 @@ public class vCloudMethod {
                     return v;
                 }
                 catch( IOException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( ParserConfigurationException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( SAXException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
             }
             else {
@@ -1398,10 +1466,30 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
 
                 vCloudException.Data data = null;
+                CloudErrorType errorType;
+                switch ((status.getStatusCode())) {
+                    case HttpServletResponse.SC_BAD_REQUEST:
+                        errorType = CloudErrorType.INVALID_USER_DATA;
+                        break;
+                    case HttpServletResponse.SC_UNAUTHORIZED:
+                    case HttpServletResponse.SC_FORBIDDEN:
+                        errorType = CloudErrorType.AUTHENTICATION;
+                        break;
+                    case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                        errorType = CloudErrorType.COMMUNICATION;
+                        break;
+                    case TOO_MANY_REQUESTS:
+                        errorType = CloudErrorType.THROTTLING;
+                        break;
+                    default:
+                        errorType = CloudErrorType.GENERAL;
+                        break;
+                }
+
 
                 if( xml != null && !xml.equals("") ) {
                     Document doc = parseXML(xml);
@@ -1415,7 +1503,7 @@ public class vCloudMethod {
                     }
                 }
                 if( data == null ) {
-                    throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
+                    throw new vCloudException(errorType, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                 }
                 logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
                 throw new vCloudException(data);
@@ -1552,7 +1640,7 @@ public class vCloudMethod {
                 status = response.getStatusLine();
             }
             catch( IOException e ) {
-                throw new CloudException(e);
+                throw new CommunicationException("Error loading vdcs", e);
             }
             if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
                 HttpEntity entity = response.getEntity();
@@ -1566,7 +1654,7 @@ public class vCloudMethod {
                     }
                 }
                 catch( IOException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 try {
                     ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
@@ -1614,13 +1702,13 @@ public class vCloudMethod {
                     org.setVdcs(vdcs);
                 }
                 catch( IOException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( ParserConfigurationException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
                 catch( SAXException e ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                    throw new CommunicationException(status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
             }
             else {
@@ -1640,10 +1728,29 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
 
                 vCloudException.Data data = null;
+                CloudErrorType errorType;
+                switch ((status.getStatusCode())) {
+                    case HttpServletResponse.SC_BAD_REQUEST:
+                        errorType = CloudErrorType.INVALID_USER_DATA;
+                        break;
+                    case HttpServletResponse.SC_UNAUTHORIZED:
+                    case HttpServletResponse.SC_FORBIDDEN:
+                        errorType = CloudErrorType.AUTHENTICATION;
+                        break;
+                    case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                        errorType = CloudErrorType.COMMUNICATION;
+                        break;
+                    case TOO_MANY_REQUESTS:
+                        errorType = CloudErrorType.THROTTLING;
+                        break;
+                    default:
+                        errorType = CloudErrorType.GENERAL;
+                        break;
+                }
 
                 if( xml != null && !xml.equals("") ) {
                     Document doc = parseXML(xml);
@@ -1657,7 +1764,7 @@ public class vCloudMethod {
                     }
                 }
                 if( data == null ) {
-                    throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
+                    throw new vCloudException(errorType, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                 }
                 logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
                 throw new vCloudException(data);
@@ -1706,7 +1813,7 @@ public class vCloudMethod {
                 minor = attr.getFirstChild().getNodeValue().trim();
             }
         }
-        throw new CloudException(type, 200, major + ":" + minor, message);
+        throw new GeneralCloudException(type, 0, major + ":" + minor, message);
     }
 
     public void parseMetaData(@Nonnull Taggable resource, @Nonnull String xml) throws CloudException, InternalException {
@@ -1766,7 +1873,7 @@ public class vCloudMethod {
             throw new InternalException(e);
         }
         catch( SAXException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
         catch( IOException e ) {
             throw new InternalException(e);
@@ -1796,7 +1903,7 @@ public class vCloudMethod {
                 }
             }
             if( vdc == null ) {
-                throw new CloudException("No VDC was identified for this request (requested " + vdcId + ")");
+                throw new ResourceNotFoundException("VDC", vdcId);
             }
             String contentType;
 
@@ -1817,10 +1924,10 @@ public class vCloudMethod {
                 endpoint = vdc.actions.get(contentType);
             }
             else {
-                throw new CloudException("Unknown content type for post");
+                throw new GeneralCloudException("Unknown content type for post", CloudErrorType.INVALID_USER_DATA);
             }
             if( endpoint == null) {
-                throw new CloudException("No endpoint for " + action);
+                throw new GeneralCloudException("No endpoint for " + action, CloudErrorType.GENERAL);
             }
             return post(action, endpoint, contentType, payload);
         }
@@ -1888,14 +1995,14 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    throw new InternalException(e);
+                    throw new CommunicationException("I/O error from server communications: " + e.getMessage(), e);
                 }
                 int code = response.getStatusLine().getStatusCode();
 
                 logger.debug("HTTP STATUS: " + code);
 
                 if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new CloudException("No action match for " + endpoint);
+                    throw new ResourceNotFoundException("Action match("+action+")", endpoint);
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
                     authenticate(true);
@@ -1920,7 +2027,7 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     return xml;
                 }
@@ -1941,10 +2048,28 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
 
                     vCloudException.Data data = null;
+                    CloudErrorType errorType;
+                    switch ((code)) {
+                        case HttpServletResponse.SC_BAD_REQUEST:
+                            errorType = CloudErrorType.INVALID_USER_DATA;
+                            break;
+                        case HttpServletResponse.SC_FORBIDDEN:
+                            errorType = CloudErrorType.AUTHENTICATION;
+                            break;
+                        case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                            errorType = CloudErrorType.COMMUNICATION;
+                            break;
+                        case TOO_MANY_REQUESTS:
+                            errorType = CloudErrorType.THROTTLING;
+                            break;
+                        default:
+                            errorType = CloudErrorType.GENERAL;
+                            break;
+                    }
 
                     if( xml != null && !xml.equals("") ) {
                         Document doc = parseXML(xml);
@@ -1958,7 +2083,7 @@ public class vCloudMethod {
                         }
                     }
                     if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                        throw new vCloudException(errorType, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
                     logger.error("[" +  code + " : " + data.title + "] " + data.description);
                     throw new vCloudException(data);
@@ -2124,14 +2249,14 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    throw new InternalException(e);
+                    throw new CommunicationException("I/O error from server communications: " + e.getMessage(), e);
                 }
                 int code = response.getStatusLine().getStatusCode();
 
                 logger.debug("HTTP STATUS: " + code);
 
                 if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new CloudException("No action match for " + endpoint);
+                    throw new ResourceNotFoundException("Action match("+action+")", endpoint);
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
                     authenticate(true);
@@ -2156,7 +2281,7 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     return xml;
                 }
@@ -2177,10 +2302,28 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
 
                     vCloudException.Data data = null;
+                    CloudErrorType errorType;
+                    switch ((code)) {
+                        case HttpServletResponse.SC_BAD_REQUEST:
+                            errorType = CloudErrorType.INVALID_USER_DATA;
+                            break;
+                        case HttpServletResponse.SC_FORBIDDEN:
+                            errorType = CloudErrorType.AUTHENTICATION;
+                            break;
+                        case HttpServletResponse.SC_SERVICE_UNAVAILABLE:
+                            errorType = CloudErrorType.COMMUNICATION;
+                            break;
+                        case TOO_MANY_REQUESTS:
+                            errorType = CloudErrorType.THROTTLING;
+                            break;
+                        default:
+                            errorType = CloudErrorType.GENERAL;
+                            break;
+                    }
 
                     if( xml != null && !xml.equals("") ) {
                         Document doc = parseXML(xml);
@@ -2194,7 +2337,7 @@ public class vCloudMethod {
                         }
                     }
                     if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                        throw new vCloudException(errorType, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
                     logger.error("[" +  code + " : " + data.title + "] " + data.description);
                     throw new vCloudException(data);

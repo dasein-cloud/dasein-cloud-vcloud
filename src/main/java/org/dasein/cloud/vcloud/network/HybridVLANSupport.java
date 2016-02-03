@@ -20,10 +20,14 @@ package org.dasein.cloud.vcloud.network;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.network.*;
+import org.dasein.cloud.network.AbstractVLANSupport;
+import org.dasein.cloud.network.IPVersion;
+import org.dasein.cloud.network.InternetGateway;
+import org.dasein.cloud.network.VLAN;
+import org.dasein.cloud.network.VLANCapabilities;
+import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -37,7 +41,10 @@ import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 
 /**
  * Implements support for vCloud networking.
@@ -66,36 +73,6 @@ public class HybridVLANSupport extends AbstractVLANSupport<vCloud> {
             capabilities = new HybridVLANCapabilities(getProvider());
         }
         return capabilities;
-    }
-
-    @Nonnull
-    @Override
-    public String getProviderTermForNetworkInterface(@Nonnull Locale locale) {
-        try {
-            return getCapabilities().getProviderTermForNetworkInterface(locale);
-        } catch (CloudException | InternalException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Nonnull
-    @Override
-    public String getProviderTermForSubnet(@Nonnull Locale locale) {
-        try {
-            return getCapabilities().getProviderTermForSubnet(locale);
-        } catch (CloudException | InternalException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Nonnull
-    @Override
-    public String getProviderTermForVlan(@Nonnull Locale locale) {
-        try {
-            return getCapabilities().getProviderTermForVlan(locale);
-        } catch (CloudException | InternalException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override
